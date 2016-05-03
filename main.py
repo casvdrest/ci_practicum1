@@ -2,7 +2,7 @@ class Main:
 
     from board import Board
 
-    sudoku1 = Board(4)
+    sudoku1 = Board(3)
     sudoku1.place(0,0,1)
     sudoku1.place(1,1,2)
     sudoku1.place(2,2,3)
@@ -13,3 +13,5 @@ class Main:
     sudoku1.place(7,7,8)
     sudoku1.place(8,8,9)
     sudoku1.print()
+    for i in range(0,9):
+        print(sudoku1.block(i))
