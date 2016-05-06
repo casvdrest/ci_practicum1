@@ -12,6 +12,13 @@ class Board:
         self.board[x,y] = n
 
     def legal(self):
+        for i in range(0,self.N2):
+            if len(set([x for x in self.row(i) if self.row(i).count(x) > 1])) > 1:
+                return False
+            if len(set([x for x in self.column(i) if self.column(i).count(x) > 1])) > 1:
+                return False
+            if len(set([x for x in self.block(i) if self.block(i).count(x) > 1])) > 1:
+                return False
         return True
 
     def finished(self):
@@ -42,12 +49,18 @@ class Board:
                 res.append(self.board[j+ix*self.N,k+iy*self.N])
         return res
 
+    def to_list(self):
+        res = []
+        for i in range(0,self.N2):
+            res.append(self.row(i))
+        return res
+
     def print(self):
         for i in range(0,self.N):
             for j in range(0,self.N):
                 st = ''
                 for k in range(0,self.N2):
-                    st += self.parse(self.board[i*self.N+j,k])
+                    st += self.parse(self.board[k,i*self.N+j])
                     st += ' '
                     if k % self.N == self.N - 1:
                         st += ' '
@@ -59,4 +72,3 @@ class Board:
             return str(n)
         else:
             return '_'
-
