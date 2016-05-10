@@ -1,15 +1,52 @@
 class Board:
 
+    from copy import deepcopy
+
     def __init__(self, N):
         self.N = N
         self.N2 = N * N
         self.board = {}
+        self.succvar = [0,0,1]
         for i in range(0,self.N2):
             for j in range(0,self.N2):
                 self.board[i,j] = 0
 
+
+    def succ(self):
+        while self.board[self.succvar[0], self.succvar[1]] > 0:
+            if self.succvar[0] < 8:
+                self.succvar[0] += 1
+            elif self.succvar[1] < 8:
+                self.succvar[0] = 0
+                self.succvar[1] += 1
+            else:
+                return None
+        res = self.deepcopy()
+        res.place(self.succvar[0],self.succvar[1],self.succvar[2])
+        if self.succvar[2] == 9:
+            self.succvar[2] = 1
+            if self.succvar[0] < 8:
+                self.succvar[0] += 1
+            else:
+                self.succvar[0] = 0
+                self.succvar[1] += 1
+        else:
+            self.succvar[2] += 1
+        return res
+
     def place(self, x, y, n):
         self.board[x,y] = n
+
+    def legal_moves(self):
+        res = []
+        for i in self.board:
+            if self.board[i] == 0:
+                for j in range(0,self.N2):
+                    self.place(i[0], i[1], j)
+                    if self.legal():
+                        res.append((i, j))
+                    self.place(i[0], i[1], 0)
+        return res
 
     def legal(self):
         for i in range(0,self.N2):

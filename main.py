@@ -13,4 +13,24 @@ class Main:
     sudoku1.place(7,7,8)
     sudoku1.place(8,6,9)
     sudoku1.print()
-    print(sudoku1.to_list())
+    i = 0
+    while i < 50:
+        succ = sudoku1.succ()
+        if succ:
+            succ.print()
+        else:
+            print("-")
+        i += 1
+
+"""
+    def backtrack(self, L):
+        if not L:
+            return None
+        t = L[0]
+        if t.finished():
+            return t
+        while
+            and not found:
+                t
+
+"""
