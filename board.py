@@ -1,6 +1,6 @@
 class Board:
 
-    import copy
+    from copy import deepcopy
 
     def __init__(self, N):
         self.N = N
@@ -21,7 +21,7 @@ class Board:
                 self.succvar[1] += 1
             else:
                 return None
-        res = self.copy()
+        res = self.deepcopy()
         res.place(self.succvar[0],self.succvar[1],self.succvar[2])
         if self.succvar[2] == 9:
             self.succvar[2] = 1
@@ -32,6 +32,7 @@ class Board:
                 self.succvar[1] += 1
         else:
             self.succvar[2] += 1
+        return res
 
     def place(self, x, y, n):
         self.board[x,y] = n
