@@ -5,34 +5,24 @@ class BackTrack:
     def __init__(self, puzzle):
         self.puzzle = puzzle
 
-    def run(self):
-        self.stack = [puzzle]
-        backtrack()
-
-    def backtrack(self):
+    def backtrack(self, stack): 
         if len(stack) == 0:
-            return []
-        else:
-            t = stack.pop()
-
-            if isGoalState(t):
+            return None
+        else
+            if is_goalstate(t)
                 return t
-            else:
-                successors = getSuccessors(t)
-                
-                found = False
-                for s in successors:
-                    stack.append(s)
-                    backtrack()
-
+            else
+                t = stack[-1]
+                while : # unexplored successors and not found
+                    stack.append(next_successor(t))
+                    backtrack(stack)
                 stack.pop()
 
+    def next_successor(self, t):
+        return None
 
-    def getSuccessors(self, state):
-        successors = []
+    def is_goalstate(self, t):
+        return None
 
-        for i in range(0, 9):
-            for j in range(0, 9):
-                if state[i, j] == 0: 
-                    for n in range(0, 9):
+
                         
