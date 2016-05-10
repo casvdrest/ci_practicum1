@@ -11,6 +11,10 @@ class Board:
             for j in range(0,self.N2):
                 self.board[i,j] = 0
 
+    def read(self, text):
+        for i in range(0, self.N2):
+            for j in range(0, self.N2):
+                self.board[i,j] = int(text[j][i])
 
     def succ(self):
         while self.board[self.succvar[0], self.succvar[1]] > 0:
