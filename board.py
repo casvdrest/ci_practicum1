@@ -53,6 +53,7 @@ class Board:
         return res
 
     def legal(self):
+        #INCORRECT
         for i in range(0,self.N2):
             if len(set([x for x in self.row(i) if self.row(i).count(x) > 1])) > 1:
                 return False
