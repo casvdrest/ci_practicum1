@@ -21,14 +21,17 @@ class BackTrack:
     def is_goalstate(self, state):
 
         # check wether the puzzle is fully completed
-        for x in range(0, state.N):
-            for y in range(0, state.N):
+        for x in range(0, state.N2):
+            for y in range(0, state.N2):
                 if state.board[x, y] == 0:
                     return False
 
-        # check wether the completed puzzle fulfills the sudoku constraints
-        
+        # check for sum in rows, columns and blocks to discard faulty solutions
+        for i in range(0, state.N):
+            if sum(state.row(i)) != 45 or sum(state.column(i)) != 45 or sum(state.block(i)) != 45:
+                return False
 
+        # check wether every number occurs exactly once in every row, column and block
 
 
 
