@@ -1,6 +1,7 @@
 class Main:
 
     from board import Board
+    from backtrack import Backtrack
 
     sudoku1 = Board(3)
     #sudoku1.place(0,0,1)
@@ -19,14 +20,10 @@ class Main:
     print(t)
     sudoku1.read(t)
     sudoku1.print()
-    i = 0
-    while i < 0:
-        succ = sudoku1.succ()
-        if succ:
-            succ.print()
-        else:
-            print("-")
-        i += 1
+    
+    prog = Backtrack(sudoku1)
+    result = prog.run()
+    result.print()
 
 """
     def backtrack(self, L):
