@@ -2,8 +2,8 @@
 
 class BackTrack:
 
-    def __init__(self, puzzle):
-        self.puzzle = puzzle
+    def __init__(self, board):
+        self.board = board
 
     def backtrack(self, stack): 
         if len(stack) == 0:
@@ -14,15 +14,23 @@ class BackTrack:
             else
                 t = stack[-1]
                 while : # unexplored successors and not found
-                    stack.append(next_successor(t))
+                    stack.append(t.next_successor())
                     backtrack(stack)
                 stack.pop()
 
-    def next_successor(self, t):
-        return None
+    def is_goalstate(self, state):
 
-    def is_goalstate(self, t):
-        return None
+        # check wether the puzzle is fully completed
+        for x in range(0, state.N):
+            for y in range(0, state.N):
+                if state.board[x, y] == 0:
+                    return False
+
+        # check wether the completed puzzle fulfills the sudoku constraints
+        
+
+
+
 
 
                         
