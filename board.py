@@ -6,15 +6,39 @@ class Board:
         self.N = N
         self.N2 = N * N
         self.board = {}
+        self.poss = {}
         self.succvar = [0,0,1]
         for i in range(0,self.N2):
             for j in range(0,self.N2):
                 self.board[i,j] = 0
+        #for i in range(0,self.N2):
+        #    for j in range(0,self.N2):
+        #        self.poss[i,j] = [1,2,3,4,5,6,7,8,9]
 
     def read(self, text):
         for i in range(0, self.N2):
             for j in range(0, self.N2):
-                self.board[i,j] = int(text[j][i])
+                v = int(text[j][i])
+                self.board[i,j] = v
+                if v != 0:
+                    self.poss[i,j] = []
+
+    def elim(self):
+        for (i,j) in self.board:
+            if self.board[i,j] > 0:
+                self.rem(i,j,self.board[i,j])
+
+    def rem(self, i, j, v):
+        for x in range(0,self.N2):
+            if x == i:
+                continue
+            if v in self.poss[x,j]:
+                self.poss[x,j].remove(v)
+        for y in range(0,self.N2):
+            if y == j:
+                continue
+            if v in self.poss[i,y]:
+                self.poss[i,y].remove(v)
 
     def succ(self):
         while self.board[self.succvar[0], self.succvar[1]] > 0:
@@ -25,17 +49,19 @@ class Board:
                 self.succvar[1] += 1
             else:
                 return None
-        res = self.deepcopy()
+        res = Board(3)
+        res.board = self.board.copy()
         res.place(self.succvar[0],self.succvar[1],self.succvar[2])
         if self.succvar[2] == 9:
             self.succvar[2] = 1
             if self.succvar[0] < 8:
                 self.succvar[0] += 1
-            else:
+            elif self.succvar[1] < 8:
                 self.succvar[0] = 0
                 self.succvar[1] += 1
         else:
             self.succvar[2] += 1
+        res.succvar = [0, 0, 1]
         return res
 
     def place(self, x, y, n):

@@ -10,7 +10,17 @@ class Backtrack:
     def run(self):
         return self.backtrack([self.board])
 
-    def backtrack(self, stack): 
+    def backtrack(self, stack):
+        """
+        o = 'backtrack called with stack: \n'
+        for i in range(0, len(stack)):
+            oo = str(i)
+            for j in range(0,9):
+                oo += str(stack[i].row(j))
+            o += oo + '\n'
+        print(o)
+        """
+
         if len(stack) == 0:
             return None
         else:
@@ -19,7 +29,7 @@ class Backtrack:
                 return t
             else:
                 succ = t.succ()
-                while succ: 
+                while succ:
                     stack.append(succ)
                     r = self.backtrack(stack)
                     if r:
@@ -29,7 +39,7 @@ class Backtrack:
 
     def is_goalstate(self, state):
 
-        # check wether the puzzle is fully completed
+        # check whether the puzzle is fully completed
         for x in range(0, state.N2):
             for y in range(0, state.N2):
                 if state.board[x, y] == 0:
@@ -40,14 +50,10 @@ class Backtrack:
             if sum(state.row(i)) != 45 or sum(state.column(i)) != 45 or sum(state.block(i)) != 45:
                 return False
 
-        # check wether every number occurs exactly once in every row, column and block
+        # check whether every number occurs exactly once in every row, column and block
         for i in range(0, state.N2):
-            if len(set(state.row[i])) != 9 or len(set(state.column[i])) != 9 or len(set(state.block[i])) != 9:
+            if len(set(state.row(i))) != 9 or len(set(state.column(i))) != 9 or len(set(state.block(i))) != 9:
                 return False
 
+
         return True
-
-
-
-
-                        
