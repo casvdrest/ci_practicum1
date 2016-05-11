@@ -12,6 +12,14 @@ class Main:
         t.append(s)
     sudoku1.read(t)
 
+    #HAAL DIT WEG ALS JE WIL BACKTRACKEN
+    a = sudoku1
+    while a:
+        s0 = time.clock()
+        a = sudoku1.succ()
+        s1 = time.clock()
+        print(s1 - s0)
+
     t0 = time.clock()
     prog = Backtrack(sudoku1)
     result = prog.run()

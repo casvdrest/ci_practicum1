@@ -6,6 +6,8 @@ class Backtrack:
 
     def __init__(self, board):
         self.board = board
+        self.found = []
+        self.i = 0
 
     def run(self):
         return self.backtrack([self.board])
@@ -20,17 +22,19 @@ class Backtrack:
             o += oo + '\n'
         print(o)
         """
-
+        self.i += 1
         if len(stack) == 0:
             return None
         else:
             t = stack[-1]
             if self.is_goalstate(t):
+                print(self.i)
                 return t
             else:
                 succ = t.succ()
-                while succ:
+                while succ and not succ.to_list() in self.found:
                     stack.append(succ)
+                    self.found.append(succ.to_list())
                     r = self.backtrack(stack)
                     if r:
                         return r
