@@ -131,7 +131,7 @@ namespace CI_practicum2
         }
     }
 
-    // Class to hold a sudoku puzzle
+    // Struct to hold a sudoku puzzle
     struct Puzzle
     {
         public int[][] Rows;
@@ -179,7 +179,7 @@ namespace CI_practicum2
 
         public void updateScores(Tuple<int, int> P1, Tuple<int, int> P2)
         {
-            this.Value -= this.Scores[P1.Item1] + this.Scores[P2.Item1] + this.Scores[P1.Item2 + N2] + this.Scores[P2.Item2 + N2];
+            this.Value -= this.Scores[P1.Item1] + this.Scores[P2.Item1] + this.Scores[P1.Item2 + Program.N2] + this.Scores[P2.Item2 + Program.N2];
 
             // update rows
             this.Scores[P1.Item1] = Program.score(this.Rows[P1.Item1]);
