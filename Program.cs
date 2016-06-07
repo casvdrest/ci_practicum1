@@ -4,22 +4,46 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BacktrackTest
+namespace CI_practicum2
 {
     class Program
     {
-        // input puzzle
-        int[][] board;
+        // Average number of states visted per restart
+        int stateCount = 0; private float stateCountAvg = 0;
 
-        // Found solution (null if no solution found)
-        int[][] result = null;
-
-        // Counts the amount of node expansions
-        int expansionCount = 0;
+        // number of restarts
+        private int restartCount = 0;
 
         // Board dimensions. N2 = N * N. Defaults to a 9x9 sudoku
-        int N = 3;
-        int N2 = 9;
+        public static int N = 3;
+        public static int N2 = 9;
+
+        // Random generator
+        private Random gen;
+
+        // Variables related to the algorithms
+        public static int S = 100;
+        public static int nrOfRestarts = 10000;
+        public static int nrOfWalks = 10000;
+        public static int K = 1000;
+
+        // Holds x and y coordinates, ordered by blocks
+        public Tuple<int, int>[] blockPositions;
+
+        // Search parameters
+        private readonly int RANDOM_RESTART_COUNT = 50000;
+        private readonly int ILS_RESTART_COUNT = 5000;
+        private readonly int ILS_WALK_LENGTH = 30;
+
+        // Possible algorithms
+        private enum Algorithm
+        {
+            HC, // Hill climb
+            RR, // Random restart local search
+            ILS // Iterated local search
+        }
+
+        private Algorithm selectedAlgorithm = Algorithm.ILS;
 
         static void Main(string[] args)
         {
@@ -33,216 +57,395 @@ namespace BacktrackTest
             N = int.Parse(Console.ReadLine());
             N2 = N * N;
 
-            // Initialize board
-            board = new int[N2][];
+            gen = new Random();
 
-            // Read board input
+            // Convert position within block to (x, y) position within the puzzle
+            blockPositions = new Tuple<int, int>[N2 * N2];
+
             for (int i = 0; i < N2; i++)
             {
-                board[i] = new int[N2];
-
-                // Assume different input formats for N = 3 and N > 3
-                if (N == 3)
+                for (int j = 0; j < N2; j++)
                 {
-                    char[] line = Console.ReadLine().ToCharArray();
-                    for (int j = 0; j < N2; j++) board[i][j] = line[j] - 48;
-                }
-                else
-                {
-                    string[] line = Console.ReadLine().Split();
-                    for (int j = 0; j < N2; j++) board[i][j] = int.Parse(line[j]);
+                    blockPositions[((((i / N) * N) + (j / N)) * N2) + (((i % N) * N) + (j % N))] = new Tuple<int, int>(i, j);
                 }
             }
 
-            // Initialize stack
-            Stack<int[][]> s = new Stack<int[][]>();
+            Puzzle startState = randomPuzzle();
 
-            // Push root to stack
-            s.Push(board);
+            Console.WriteLine();
+            Console.WriteLine("Starting position (value " + startState.Value + "):");
+            printPuzzle(startState);
 
-            // Call backtrack procedure
-            Console.WriteLine("\nStarted backtrack search, awaiting results ...\n");
-            backtrack(s);
-
-            // Check whether a solution has been found
-            if (result != null)
+            switch (selectedAlgorithm)
             {
-                // Print solution
-                for (int i = 0; i < N2; i++)
-                {
-                    for (int j = 0; j < N2; j++)
-                    {
-                        Console.Write(result[i][j]);
-                        if (j % N == N - 1) Console.Write(' ');
-                    }
-                    Console.Write('\n');
-                    if (i % N == N - 1) Console.WriteLine();
-                }
-                Console.WriteLine(expansionCount + " nodes expanded");
+                case Algorithm.HC: Console.Write("Started regular hill climb:"); break;
+                case Algorithm.RR: Console.Write("Started random restart local search"); break;
+                case Algorithm.ILS: Console.Write("Started iterated local search"); break;
             }
-            else
-            {
-                Console.WriteLine("No Solution found");
-            }
+
+            Console.WriteLine(" ... Awaiting results");
+
+            Puzzle result = improvingNeighbour(startState);
+
+            Console.WriteLine("Found optimum (value " + result.Value + "):");
+            printPuzzle(result);
+
+            Console.WriteLine();
+            Console.WriteLine("Restarts: " + restartCount);
+            Console.WriteLine("Average number states visited per restart: " + stateCountAvg);
             Console.ReadLine();
         }
 
-        // Backtrack procedure
-        public void backtrack(Stack<int[][]> stack)
+        public void printPuzzle(Puzzle puzzle)
         {
-            // Increment expansion counter
-            expansionCount++;
-
-            // Exit if stack is empty
-            if (stack.Count == 0)
-            {
-                return;
-            }
-
-            else {
-                // Pop next node from stack
-                int[][] t = stack.Pop();
-
-                // Suspend search if a solution is found
-                if (isGoalState(t))
-                {
-                    result = t;
-                    return;
-                }
-                else {
-                    // Retrieve successors
-                    List<int[][]> successors = getSuccessors(t);
-
-                    // push successors on stack and continue searching
-                    foreach (int[][] s in successors)
-                    {
-                        stack.Push(s);
-                        backtrack(stack);
-                        if (result != null)
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Gets the successor states of a given state
-        public List<int[][]> getSuccessors(int[][] state)
-        {
-            List<int[][]> successors = new List<int[][]>();
-            
-            // Find first empty slot
+            // Print solution
             for (int i = 0; i < N2; i++)
             {
                 for (int j = 0; j < N2; j++)
                 {
-                    if (state[i][j] == 0)
-                    {
-                        // Generate successors
-                        for (int n = 1; n < N2 + 1; n++)
-                        {
-                            // Discard successors if they're known to not be feasible
-                            if (contains(state[i], n) || contains(column(j, state), n) || 
-                                contains(block((int)(Math.Floor(i / (float)N) + Math.Floor(j / (float)N) * N), state), n))
-                            {
-                                continue;
-                            }
+                    Console.Write(puzzle.Rows[i][j]);
+                    if (j % N == N - 1) Console.Write(' ');
+                }
+                Console.Write('\n');
+                if (i % N == N - 1) Console.WriteLine();
+            }
+        }
 
-                            // create successor state 
-                            int[][] sstate = new int[N2][];
-                            for (int x = 0; x < N2; x++)
-                            {
-                                sstate[x] = new int[N2];
-                                for (int y = 0; y < N2; y++)
-                                {
-                                    sstate[x][y] = state[x][y];
-                                }
-                            }
-                            sstate[i][j] = n;
-                            successors.Add(sstate);
-                        }
-                        return successors;
+        // Generates a random puzzle
+        public Puzzle randomPuzzle()
+        {
+            int[][] blocks = new int[N2][];
+            int[][] rows = new int[N2][];
+            int[][] columns = new int[N2][];
+            int[] lst = new int[N2];
+
+            for (int i = 0; i < N2; i++)
+            {
+                lst[i] = i + 1;
+                rows[i] = new int[N2];
+                columns[i] = new int[N2];
+            }
+
+            for (int i = 0; i < N2; i++)
+            {
+                lst = shuffleList(lst);
+                blocks[i] = lst;
+
+                int[] tmprow = new int[N2];
+                int[] tmpcol = new int[N2];
+
+                for (int j = 0; j < N2; j++)
+                {
+                    int row = ((i / N) * N) + (j / N);
+                    int col = ((i % N) * N) + (j % N);
+                    rows[row][col] = blocks[i][j];
+                    columns[col][row] = blocks[i][j];
+                }
+            }
+
+            Puzzle state = new Puzzle(rows, columns);
+            state.setScores(evaluate(state));
+            return state;
+        }
+
+        // Perform a standard hill climb search, given an initial state
+        public Puzzle hillClimb(Puzzle state)
+        {
+            int stateCount = 0;
+            restartCount++;
+            Puzzle next = improvingNeighbour(state);
+            while (next.Value != state.Value)
+            {
+                stateCount++;
+                state = next;
+                next = improvingNeighbour(state);
+            }
+
+            stateCountAvg = (stateCountAvg + stateCount) / (1.0f + (stateCountAvg > 0 ? 1.0f : 0.0f));
+            return state;
+        }
+
+        // Returns a random permutation of a given list
+        public int[] shuffleList(int[] list)
+        {
+            int n = list.Length;
+            while (n > 1)
+            {
+                n--;
+                int k = gen.Next(n + 1);
+                int value = list[k];
+                list[k] = list[n];
+                list[n] = value;
+            }
+            return list;
+        }
+
+        // Perform random restart hill climb
+        public Puzzle randomRestartHillClimb(Puzzle startState)
+        {
+            Puzzle bestResult = hillClimb(startState);
+            int bestValue = bestResult.Value;
+            for (int i = 1; i < RANDOM_RESTART_COUNT - 1; i++)
+            {
+                Puzzle state = randomPuzzle();
+                Puzzle result = hillClimb(state);
+                if (result.Value < bestValue)
+                {
+                    bestValue = result.Value;
+                    bestResult = result;
+                }
+            }
+            return bestResult;
+        }
+
+        // Perform iterated local search
+        public Puzzle iteratedLocalSearch(Puzzle startState)
+        {
+            Console.Write("||");
+            int p50 = ILS_RESTART_COUNT / 50;
+            int bar = p50;
+            Puzzle state = hillClimb(startState);
+            int bestValue = state.Value;
+            for (int i = 0; i < ILS_RESTART_COUNT - 1; i++)
+            {
+                Puzzle next = randomWalk(state);
+                next = hillClimb(next);
+                if (next.Value < state.Value)
+                {
+                    state = next;
+                    bestValue = next.Value;
+                }
+                if (restartCount % p50 == 0)
+                {
+                    Console.Write('#');
+                    bar += p50;
+                    if (restartCount % (p50 * 5) == 0)
+                    {
+                        Console.Write('|');
                     }
                 }
             }
-
-            // Return empty list if no successors
-            return successors;
+            Console.Write("|\n");
+            return state;
         }
 
-        // Determines whether a given state is a goal state
-        public bool isGoalState(int[][] state)
+        //Performs a random walk of S random steps, given an initial state
+        public Puzzle randomWalk(Puzzle state)
         {
-            // Check whether the state is completely filled out
+            for (int i = 0; i < ILS_WALK_LENGTH; i++)
+            {
+                state = randomNeighbour(state);
+            }
+            return state;
+        }
+
+        // Returns a random neighbour
+        public Puzzle randomNeighbour(Puzzle state)
+        {
+            int randomBlock = gen.Next(N2);
+            int randomP1 = gen.Next(N2);
+            int randomP2 = gen.Next(N2 - 1);
+            if (randomP2 == randomP1)
+                randomP2 = N2 - 1;
+            Tuple<int, int> P1 = blockPositions[randomBlock * N2 + randomP1];
+            Tuple<int, int> P2 = blockPositions[randomBlock * N2 + randomP2];
+            state.Swap(P1, P2);
+            return state;
+        }
+
+        public Puzzle tabuSearch(Puzzle state)
+        {
+            Stack<Puzzle> tabuList = new Stack<Puzzle>();
+            tabuList.Push(state);
+            Puzzle best = state;
+            List<Puzzle> nextList = neighbours(state).Except(tabuList).ToList();
+            int maxValue = 0;
+            Puzzle next = state;
+            foreach (Puzzle p in nextList)
+                if (p.Value > maxValue)
+                {
+                    maxValue = p.Value;
+                    next = p;
+                }
+            while (true)
+            {
+                printPuzzle(state);
+                Console.WriteLine("--------------");
+                if (next.Value <= best.Value)
+                {
+                    best = next;
+                }
+                state = next;
+                tabuList.Push(state);
+                if (tabuList.Count > K)
+                    tabuList.Pop();
+                nextList = neighbours(state).Except(tabuList).ToList();
+                if (nextList.Count == 0)
+                    break;
+                maxValue = 0;
+                foreach (Puzzle p in nextList)
+                    if (p.Value > maxValue)
+                    {
+                        maxValue = p.Value;
+                        next = p;
+                    }
+            }
+            return best;
+        }
+        
+        public List<Puzzle> neighbours(Puzzle state)
+        {
+            List<Puzzle> neighbours = new List<Puzzle>();
             for (int i = 0; i < N2; i++)
             {
-                for (int j = 0; j < N2; j++)
+                for (int s = 0; s < N2 - 1; s++)
                 {
-                    if (state[i][j] == 0)
-                        return false;
+                    for (int e = s + 1; e < N2; e++)
+                    {
+                        Puzzle neighbour = Puzzle.fromState(state);
+                        Tuple<int, int> P1 = blockPositions[i * N2 + s];
+                        Tuple<int, int> P2 = blockPositions[i * N2 + e];
+                        neighbour.Swap(P1, P2);
+                        neighbours.Add(neighbour);
+                    }
                 }
             }
-
-            // Check whether all rows, columns and blocks sum to 45
-            for (int i = 0; i < 9; i++)
+            foreach (Puzzle neighbour in neighbours)
             {
-                if (listSum(state[i]) != 45 || listSum(column(i, state)) != 45 || listSum(block(i, state)) != 45)
-                    return false;
+                Console.WriteLine("Neighbour: ");
+                printPuzzle(neighbour);
+                Console.WriteLine("---------");
             }
-
-            // TODO add final constraint
-            return true;
+            Console.WriteLine(neighbours.Count);
+            Console.ReadLine();
+            return neighbours;
         }
 
-        // Find the sum of a list
-        public int listSum(int[] list)
+        // Find a neighbour that improves over the current state
+        public Puzzle improvingNeighbour(Puzzle state)
         {
-            int sum = 0;
-            for (int i = 0; i < 9; i++)
+            // Loop through blocks
+            for (int i = 0; i < N2; i++)
             {
-                sum += list[i];
+                for (int s = 0; s < N2 - 1; s++)
+                {
+                    for (int e = s + 1; e < N2; e++)
+                    {
+                        Puzzle neighbour = Puzzle.fromState(state);
+                        Tuple<int, int> P1 = blockPositions[i * N2 + s];
+                        Tuple<int, int> P2 = blockPositions[i * N2 + e];
+                        neighbour.Swap(P1, P2);
+                        if (neighbour.Value < state.Value)
+                        {
+                            return neighbour;
+                        }
+                    }
+                }
             }
-            return sum;
+            return state;
         }
 
-        // Retrieve block at index from state
-        public int[] block(int index, int[][] state)
+        // evaluate a state
+        public int[] evaluate(Puzzle state)
         {
-            int[] result = new int[9];
-            int x = index % 3;
-            int y = index / 3;
+            int[] eval = new int[N2 * 2];
+            for (int i = 0; i < N2; i++)
+            {
+                eval[i] = score(state.Rows[i]);
+                eval[i + N2] = score(state.Columns[i]);
+            }
+            return eval;
+        }
+
+        // assign score to row or column
+        public static int score(int[] list)
+        {
+            int dups = 0;
+            int score = 0;
+
+            for (int i = 0; i < N2; i++)
+            {
+                int mask = 1 << (list[i] - 1);
+                score += ((mask & dups) > 0) ? 1 : 0;
+                dups |= mask;
+            }
+            return score;
+        }
+    }
+
+    // Struct to hold a sudoku puzzle
+    struct Puzzle
+    {
+        public int[][] Rows;
+        public int[][] Columns;
+
+        public int[] Scores;
+        public int Value;
+
+        // Create new puzzle
+        public Puzzle(int[][] rows, int[][] columns)
+        {
+            this.Rows = rows;
+            this.Columns = columns;
+
+            this.Scores = new int[0];
+            this.Value = 0;
+        }
+
+        public static Puzzle fromState(Puzzle state)
+        {
+            return new Puzzle(state.Rows, state.Columns) { Scores = state.Scores, Value = state.Value };
+        }
+
+        public void setScores(int[] scores)
+        {
+            this.Scores = scores;
+
+            this.Value = 0;
+            for (int i = 0; i < scores.Length; i++)
+            {
+                this.Value += scores[i];
+            }
+        }
+
+        // Swap operator
+        public void Swap(Tuple<int, int> P1, Tuple<int, int> P2)
+        {
+            // retrieve values
+            int v1 = Rows[P1.Item1][P1.Item2];
+            int v2 = Rows[P2.Item1][P2.Item2];
+
+            // update rows
+            Rows[P1.Item1][P1.Item2] = v2;
+            Rows[P2.Item1][P2.Item2] = v1;
+
+            // update columns
+            Columns[P1.Item2][P1.Item1] = v2;
+            Columns[P2.Item2][P2.Item1] = v1;
             
-            for (int i = 0; i < 3; i++)
-            {
-                for (int j = 0; j < 3; j++)
-                {
-                    result[j + i * 3] = state[i + x * 3][j + y * 3];
-                }
-            }
-
-            return result;
+            updateScores(P1, P2);
         }
 
-        // Retrieve column at index from state
-        public int[] column(int index, int[][] state)
+        // Update state value after swap
+        public void updateScores(Tuple<int, int> P1, Tuple<int, int> P2)
         {
-            int[] res = new int[9];
-            for (int i = 0; i < 9; i++)
+            Scores[P1.Item1] = Program.score(Rows[P1.Item1]);
+            if (P1.Item1 != P2.Item1)
             {
-                res[i] = state[i][index];
+                Scores[P2.Item1] = Program.score(Rows[P2.Item1]);
             }
-            return res;
-        }
 
-        // Check whether a list contains integer n
-        public bool contains(int[] lst, int n)
-        {
-            for (int i = 0; i < lst.Length; i++)
+            Scores[P1.Item2 + Program.N2] = Program.score(Columns[P1.Item2]);
+            if (P1.Item2 != P2.Item2)
             {
-                if (lst[i] == n) return true;
+                Scores[P2.Item2 + Program.N2] = Program.score(Columns[P2.Item2]);
             }
-            return false;
+
+            Value = 0;
+            for (int i = 0; i < Program.N2 * 2; i++)
+            {
+                Value += Scores[i];
+            }
         }
     }
 }
