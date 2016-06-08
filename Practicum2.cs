@@ -27,9 +27,9 @@ namespace CI_practicum2
         public Tuple<int, int>[] blockPositions;
 
         // Search parameters
-        private readonly int RANDOM_RESTART_COUNT = 100;
-        private readonly int ILS_RESTART_COUNT    = 10;
-        private readonly int ILS_WALK_LENGTH      = 40;
+        private int RANDOM_RESTART_COUNT = 100;
+        private int ILS_RESTART_COUNT    = 10;
+        private int ILS_WALK_LENGTH      = 40;
 
         // Bitmasks
         public static int[] masks;
@@ -55,6 +55,12 @@ namespace CI_practicum2
             Console.Write("Please enter N:");
             N = int.Parse(Console.ReadLine());
             N2 = N * N;
+
+            switch (N)
+            {
+                case 4: ILS_WALK_LENGTH = 170; break;
+                case 5: ILS_WALK_LENGTH = 500; break;
+            }
 
             // Convert position within block to (x, y) position within the puzzle
             blockPositions = new Tuple<int, int>[N2 * N2];
@@ -90,7 +96,13 @@ namespace CI_practicum2
 
             Console.WriteLine(" ... Awaiting results");
 
-            int[][] result = iteratedLocalSearch(state);
+            int[][] result = null;
+            switch (selectedAlgorithm)
+            {
+                case Algorithm.HC: result = hillClimb(state); break;
+                case Algorithm.RR: result = randomRestartHillClimb(state); break;
+                case Algorithm.ILS: result = iteratedLocalSearch(state); break;
+            }
 
             Console.WriteLine("Found optimum (value " + evaluate(result) + "):");
             printPuzzle(result);
