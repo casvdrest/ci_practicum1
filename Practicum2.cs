@@ -28,8 +28,10 @@ namespace CI_practicum2
 
         // Search parameters
         private int RANDOM_RESTART_COUNT = 100;
-        private int ILS_RESTART_COUNT    = 10;
-        private int ILS_WALK_LENGTH      = 40;
+        private int ILS_RESTART_COUNT = 10;
+        private int ILS_WALK_LENGTH = 40;
+        private int TABU_LIST_LENGTH = 40;
+        private int TABU_SEARCH_MAX_LOOPS = 1000;
 
         // Bitmasks
         public static int[] masks;
@@ -39,10 +41,11 @@ namespace CI_practicum2
         {
             HC, // Hill climb
             RR, // Random restart local search
-            ILS // Iterated local search
+            ILS, // Iterated local search
+            TB // Tabu search
         }
 
-        private Algorithm selectedAlgorithm = Algorithm.ILS;
+        private Algorithm selectedAlgorithm = Algorithm.TB;
 
         static void Main(string[] args)
         {
@@ -92,6 +95,7 @@ namespace CI_practicum2
                 case Algorithm.HC: Console.Write("Started regular hill climb:"); break;
                 case Algorithm.RR: Console.Write("Started random restart local search"); break;
                 case Algorithm.ILS: Console.Write("Started iterated local search"); break;
+                case Algorithm.TB: Console.Write("Started tabu search"); break;
             }
 
             Console.WriteLine(" ... Awaiting results");
@@ -102,6 +106,7 @@ namespace CI_practicum2
                 case Algorithm.HC: result = hillClimb(state); break;
                 case Algorithm.RR: result = randomRestartHillClimb(state); break;
                 case Algorithm.ILS: result = iteratedLocalSearch(state); break;
+                case Algorithm.TB: result = tabuSearch(state); break;
             }
 
             Console.WriteLine("Found optimum (value " + evaluate(result) + "):");
@@ -207,13 +212,11 @@ namespace CI_practicum2
             {
                 state = next;
                 next = improvingNeighbour(next);
-
                 stateValue = nextValue;
                 nextValue = evaluate(next);
-
                 stateCount++;
             }
-     
+
             stateCountAvg = (stateCountAvg + stateCount) / (1.0f + (stateCountAvg > 0 ? 1.0f : 0.0f));
 
             return state;
@@ -285,8 +288,6 @@ namespace CI_practicum2
         public int[][] iteratedLocalSearch(int[][] startState)
         {
             int p50 = ILS_RESTART_COUNT / 50;
-            int bar = 0;
-
             int[][] state = hillClimb(startState);
             int bestValue = evaluate(state);
             for (int i = 0; bestValue > 0 && i < ILS_RESTART_COUNT - 1; i++)
@@ -322,7 +323,6 @@ namespace CI_practicum2
                 randomP2 = N2 - 1;
             Tuple<int, int> P1 = blockPositions[randomBlock * N2 + randomP1];
             Tuple<int, int> P2 = blockPositions[randomBlock * N2 + randomP2];
-
             state = swap(state, P1, P2);
             return state;
         }
@@ -330,62 +330,75 @@ namespace CI_practicum2
         // Perform a tabu search
         public int[][] tabuSearch(int[][] state)
         {
-            Stack<int[][]> tabuList = new Stack<int[][]>();
-            tabuList.Push(state);
+            Queue<Tuple<int, int, int, int>> tabuList = new Queue<Tuple<int, int, int, int>>();
             int[][] best = state;
-
-            List<int[][]> nextList = neighbours(state).Except(tabuList).ToList();
-            int maxValue = 0;
-            int[][] next = state;
-
-            foreach (int[][] p in nextList)
-                if (evaluate(p) > maxValue)
-                {
-                    maxValue = evaluate(p);
-                    next = p;
-                }
-            while (true)
+            int[][] next = tabuNeighbour(state, tabuList);
+            
+            int i = TABU_SEARCH_MAX_LOOPS;
+            while (evaluate(best) > 0 && i > 0)
             {
-                if (evaluate(next) <= evaluate(best))
+                if (evaluate(next) < evaluate(best))
                 {
                     best = next;
                 }
                 state = next;
-                tabuList.Push(state);
-                if (tabuList.Count > 1)
-                    tabuList.Pop();
-                nextList = neighbours(state).Except(tabuList).ToList();
-                if (nextList.Count == 0)
-                    break;
-                maxValue = 0;
-                foreach (int[][] p in nextList)
-                    if (evaluate(p) > maxValue)
-                    {
-                        maxValue = evaluate(p);
-                        next = p;
-                    }
+                next = tabuNeighbour(state, tabuList);
+                i--;
             }
             return best;
         }
 
-        public List<int[][]> neighbours(int[][] state)
+        // Find improving neighbour that is not in the tabu list
+        public int[][] tabuNeighbour(int[][] state, Queue<Tuple<int, int, int, int>> tabuList)
         {
-            List<int[][]> neighbours = new List<int[][]>();
+            int[] stateScores = new int[N2 * 2];
+            for (int i = 0; i < N2; i++)
+            {
+                stateScores[i] = score(state[i]);
+                stateScores[i + N2] = score(column(state, i));
+            }
+
+            int[][] neighbour;
             for (int i = 0; i < N2; i++)
             {
                 for (int s = 0; s < N2 - 1; s++)
                 {
                     for (int e = s + 1; e < N2; e++)
                     {
-                        int[][] neighbour;
                         Tuple<int, int> P1 = blockPositions[i * N2 + s];
                         Tuple<int, int> P2 = blockPositions[i * N2 + e];
+
+                        if (tabuList.Contains(new Tuple<int, int, int, int>(P1.Item1, P1.Item2, P2.Item1, P2.Item2)))
+                        {
+                            continue;
+                        }
+
                         neighbour = swap(state, P1, P2);
-                        neighbours.Add(neighbour);
+
+                        int rowScores = 0;
+                        int colScores = 0;
+
+                        if (P1.Item1 != P2.Item1)
+                        {
+                            rowScores = ((score(neighbour[P1.Item1]) + score(neighbour[P2.Item1])) - (stateScores[P1.Item1] + stateScores[P2.Item1]));
+                        }
+
+                        if (P1.Item2 != P2.Item2)
+                        {
+                            colScores = ((score(column(neighbour, P1.Item2)) + score(column(neighbour, P2.Item2))) - (stateScores[P1.Item2 + N2] + stateScores[P2.Item2 + N2]));
+                        }
+
+                        if (rowScores + colScores <= 0)
+                        {
+                            tabuList.Enqueue(new Tuple<int, int, int, int>(P1.Item1, P1.Item2, P2.Item1, P2.Item2));
+                            if (tabuList.Count > TABU_LIST_LENGTH)
+                                tabuList.Dequeue();
+                            return neighbour;
+                        }
                     }
                 }
             }
-            return neighbours;
+            return state;
         }
 
         // Evaluate puzzle
@@ -403,7 +416,7 @@ namespace CI_practicum2
         public int score(int[] list)
         {
             int dups = 0;
-            int score = 0; 
+            int score = 0;
 
             for (int i = 0; i < N2; i++)
             {
@@ -438,7 +451,7 @@ namespace CI_practicum2
             }
 
             swapTransform(ref newState, P1, P2);
-            return newState; 
+            return newState;
         }
 
         public void swapTransform(ref int[][] state, Tuple<int, int> P1, Tuple<int, int> P2)
