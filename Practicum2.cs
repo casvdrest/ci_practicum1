@@ -28,7 +28,7 @@ namespace CI_practicum2
 
         // Search parameters
         private readonly int RANDOM_RESTART_COUNT = 100;
-        private readonly int ILS_RESTART_COUNT    = 100;
+        private readonly int ILS_RESTART_COUNT    = 10;
         private readonly int ILS_WALK_LENGTH      = 40;
 
         // Bitmasks
@@ -90,7 +90,7 @@ namespace CI_practicum2
 
             Console.WriteLine(" ... Awaiting results");
 
-            int[][] result = tabuSearch(state);
+            int[][] result = iteratedLocalSearch(state);
 
             Console.WriteLine("Found optimum (value " + evaluate(result) + "):");
             printPuzzle(result);
@@ -101,18 +101,36 @@ namespace CI_practicum2
             Console.ReadLine();
         }
 
+        // Print puzzle
         public void printPuzzle(int[][] puzzle)
         {
-            // Print solution
             for (int i = 0; i < N2; i++)
             {
                 for (int j = 0; j < N2; j++)
                 {
+                    if (N > 3 && puzzle[i][j] < 10)
+                    {
+                        Console.Write(' ');
+                    }
                     Console.Write(puzzle[i][j]);
-                    if (j % N == N - 1) Console.Write(' ');
+                    if (N > 3)
+                    {
+                        Console.Write(' ');
+                    }
+                    if (j % N == N - 1)
+                    {
+                        if (N > 3)
+                        {
+                            Console.Write(' ');
+                        }
+                        Console.Write(' ');
+                    }
                 }
                 Console.Write('\n');
-                if (i % N == N - 1) Console.WriteLine();
+                if (i % N == N - 1)
+                {
+                    Console.WriteLine();
+                }
             }
         }
 
@@ -170,20 +188,35 @@ namespace CI_practicum2
 
             int[][] next = improvingNeighbour(state);
 
-            while (evaluate(next) < evaluate(state))
+            int stateValue = evaluate(state);
+            int nextValue = evaluate(next);
+
+            while (nextValue < stateValue)
             {
                 state = next;
                 next = improvingNeighbour(next);
+
+                stateValue = nextValue;
+                nextValue = evaluate(next);
+
                 stateCount++;
             }
-
+     
             stateCountAvg = (stateCountAvg + stateCount) / (1.0f + (stateCountAvg > 0 ? 1.0f : 0.0f));
 
             return state;
         }
 
+        // Find a neighbour that improves over the current state
         public int[][] improvingNeighbour(int[][] state)
         {
+            int[] stateScores = new int[N2 * 2];
+            for (int i = 0; i < N2; i++)
+            {
+                stateScores[i] = score(state[i]);
+                stateScores[i + N2] = score(column(state, i));
+            }
+
             int[][] neighbour;
             for (int i = 0; i < N2; i++)
             {
@@ -195,7 +228,20 @@ namespace CI_practicum2
                         Tuple<int, int> P2 = blockPositions[i * N2 + e];
 
                         neighbour = swap(state, P1, P2);
-                        if (evaluate(neighbour) < evaluate(state))
+                        int rowScores = 0;
+                        int colScores = 0;
+
+                        if (P1.Item1 != P2.Item1)
+                        {
+                            rowScores = ((score(neighbour[P1.Item1]) + score(neighbour[P2.Item1])) - (stateScores[P1.Item1] + stateScores[P2.Item1]));
+                        }
+
+                        if (P1.Item2 != P2.Item2)
+                        {
+                            colScores = ((score(column(neighbour, P1.Item2)) + score(column(neighbour, P2.Item2))) - (stateScores[P1.Item2 + N2] + stateScores[P2.Item2 + N2]));
+                        }
+
+                        if (rowScores + colScores < 0)
                         {
                             return neighbour;
                         }
@@ -205,22 +251,7 @@ namespace CI_practicum2
             return state;
         }
 
-        public int[][] swap(int[][] state, Tuple<int, int> P1, Tuple<int, int> P2)
-        {
-            int[][] newState = new int[N2][];
-            for (int i = 0; i < N2; i++)
-            {
-                int[] row = new int[N2];
-                state[i].CopyTo(row, 0);
-                newState[i] = row;
-            }
-
-            int tmp = newState[P1.Item1][P1.Item2];
-            newState[P1.Item1][P1.Item2] = newState[P2.Item1][P2.Item2];
-            newState[P2.Item1][P2.Item2] = tmp;
-            return newState;
-        }
-
+        // Perform a random restart local search
         public int[][] randomRestartHillClimb(int[][] startState)
         {
             int[][] bestResult = hillClimb(startState);
@@ -241,14 +272,12 @@ namespace CI_practicum2
         // Perform iterated local search
         public int[][] iteratedLocalSearch(int[][] startState)
         {
-            Console.WriteLine();
-            Console.WriteLine("||-----|-----|-----|-----|-----|-----|-----|-----|-----|-----||");
-            Console.Write("||");
             int p50 = ILS_RESTART_COUNT / 50;
-            int bar = p50;
+            int bar = 0;
+
             int[][] state = hillClimb(startState);
             int bestValue = evaluate(state);
-            for (int i = 0; i < ILS_RESTART_COUNT - 1; i++)
+            for (int i = 0; bestValue > 0 && i < ILS_RESTART_COUNT - 1; i++)
             {
                 int[][] next = randomWalk(state);
                 next = hillClimb(next);
@@ -257,22 +286,11 @@ namespace CI_practicum2
                     state = next;
                     bestValue = evaluate(next);
                 }
-                if (restartCount % p50 == 0)
-                {
-                    Console.Write('#');
-                    bar += p50;
-                    if (restartCount % (p50 * 5) == 0)
-                    {
-                        Console.Write('|');
-                    }
-                }
             }
-            Console.Write("|\n");
-            Console.WriteLine();
             return state;
         }
 
-        //Performs a random walk of S random steps, given an initial state
+        // Performs a random walk of S random steps, given an initial state
         public int[][] randomWalk(int[][] state)
         {
             for (int i = 0; i < ILS_WALK_LENGTH; i++)
@@ -292,7 +310,9 @@ namespace CI_practicum2
                 randomP2 = N2 - 1;
             Tuple<int, int> P1 = blockPositions[randomBlock * N2 + randomP1];
             Tuple<int, int> P2 = blockPositions[randomBlock * N2 + randomP2];
-            return swap(state, P1, P2);
+
+            state = swap(state, P1, P2);
+            return state;
         }
 
         // Perform a tabu search
@@ -392,6 +412,28 @@ namespace CI_practicum2
                 col[i] = state[i][index];
             }
             return col;
+        }
+
+        // Swap the numbers at positions P1 and P2 in state, returning a NEW STATE
+        public int[][] swap(int[][] state, Tuple<int, int> P1, Tuple<int, int> P2)
+        {
+            int[][] newState = new int[N2][];
+            for (int i = 0; i < N2; i++)
+            {
+                int[] row = new int[N2];
+                state[i].CopyTo(row, 0);
+                newState[i] = row;
+            }
+
+            swapTransform(ref newState, P1, P2);
+            return newState; 
+        }
+
+        public void swapTransform(ref int[][] state, Tuple<int, int> P1, Tuple<int, int> P2)
+        {
+            int tmp = state[P1.Item1][P1.Item2];
+            state[P1.Item1][P1.Item2] = state[P2.Item1][P2.Item2];
+            state[P2.Item1][P2.Item2] = tmp;
         }
     }
 }
