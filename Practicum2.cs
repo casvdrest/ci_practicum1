@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -25,9 +27,12 @@ namespace CI_practicum2
         public Tuple<int, int>[] blockPositions;
 
         // Search parameters
-        private readonly int RANDOM_RESTART_COUNT = 50000;
-        private readonly int ILS_RESTART_COUNT    = 5000;
-        private readonly int ILS_WALK_LENGTH      = 30;
+        private readonly int RANDOM_RESTART_COUNT = 100;
+        private readonly int ILS_RESTART_COUNT    = 100;
+        private readonly int ILS_WALK_LENGTH      = 40;
+
+        // Bitmasks
+        public static int[] masks;
 
         // Possible algorithms
         private enum Algorithm
@@ -51,8 +56,6 @@ namespace CI_practicum2
             N = int.Parse(Console.ReadLine());
             N2 = N * N;
 
-            gen = new Random();
-
             // Convert position within block to (x, y) position within the puzzle
             blockPositions = new Tuple<int, int>[N2 * N2];
             for (int i = 0; i < N2; i++)
@@ -63,11 +66,20 @@ namespace CI_practicum2
                 }
             }
 
-            Puzzle startState = randomPuzzle();
+            // Create bitmasks
+            masks = new int[N2];
+            for (int i = 0; i < N2; i++)
+            {
+                masks[i] = 1 << i;
+            }
+
+            gen = new Random();
+
+            int[][] state = randomPuzzle();
 
             Console.WriteLine();
-            Console.WriteLine("Starting position (value " + startState.Value + "):");
-            printPuzzle(startState);
+            Console.WriteLine("Starting position (value " + evaluate(state) + "):");
+            printPuzzle(state);
 
             switch (selectedAlgorithm)
             {
@@ -78,9 +90,9 @@ namespace CI_practicum2
 
             Console.WriteLine(" ... Awaiting results");
 
-            Puzzle result = iteratedLocalSearch(startState);
+            int[][] result = tabuSearch(state);
 
-            Console.WriteLine("Found optimum (value " + result.Value + "):");
+            Console.WriteLine("Found optimum (value " + evaluate(result) + "):");
             printPuzzle(result);
 
             Console.WriteLine();
@@ -89,14 +101,14 @@ namespace CI_practicum2
             Console.ReadLine();
         }
 
-        public void printPuzzle(Puzzle puzzle)
+        public void printPuzzle(int[][] puzzle)
         {
             // Print solution
             for (int i = 0; i < N2; i++)
             {
                 for (int j = 0; j < N2; j++)
                 {
-                    Console.Write(puzzle.Rows[i][j]);
+                    Console.Write(puzzle[i][j]);
                     if (j % N == N - 1) Console.Write(' ');
                 }
                 Console.Write('\n');
@@ -105,18 +117,16 @@ namespace CI_practicum2
         }
 
         // Generates a random puzzle
-        public Puzzle randomPuzzle()
+        public int[][] randomPuzzle()
         {
-            int[][] blocks = new int[N2][];
             int[][] rows = new int[N2][];
-            int[][] columns = new int[N2][];
+            int[][] blocks = new int[N2][];
             int[] lst = new int[N2];
 
             for (int i = 0; i < N2; i++)
             {
                 lst[i] = i + 1;
                 rows[i] = new int[N2];
-                columns[i] = new int[N2];
             }
 
             for (int i = 0; i < N2; i++)
@@ -132,30 +142,9 @@ namespace CI_practicum2
                     int row = ((i / N) * N) + (j / N);
                     int col = ((i % N) * N) + (j % N);
                     rows[row][col] = blocks[i][j];
-                    columns[col][row] = blocks[i][j];
                 }
             }
-
-            Puzzle state = new Puzzle(rows, columns);
-            state.setScores(evaluate(state));
-            return state;
-        }
-
-        // Perform a standard hill climb search, given an initial state
-        public Puzzle hillClimb(Puzzle state)
-        {
-            int stateCount = 0;
-            restartCount++;
-            Puzzle next = improvingNeighbour(state);
-            while (next.Value != state.Value)
-            {
-                stateCount++;
-                state = next;
-                next = improvingNeighbour(state);
-            }
-
-            stateCountAvg = (stateCountAvg + stateCount) / (1.0f + (stateCountAvg > 0 ? 1.0f : 0.0f));
-            return state;
+            return rows;
         }
 
         // Returns a random permutation of a given list
@@ -173,18 +162,76 @@ namespace CI_practicum2
             return list;
         }
 
-        // Perform random restart hill climb
-        public Puzzle randomRestartHillClimb(Puzzle startState)
+        // Perform a standard hill climb search, given an initial state
+        public int[][] hillClimb(int[][] state)
         {
-            Puzzle bestResult = hillClimb(startState);
-            int bestValue = bestResult.Value;
+            int stateCount = 0;
+            restartCount++;
+
+            int[][] next = improvingNeighbour(state);
+
+            while (evaluate(next) < evaluate(state))
+            {
+                state = next;
+                next = improvingNeighbour(next);
+                stateCount++;
+            }
+
+            stateCountAvg = (stateCountAvg + stateCount) / (1.0f + (stateCountAvg > 0 ? 1.0f : 0.0f));
+
+            return state;
+        }
+
+        public int[][] improvingNeighbour(int[][] state)
+        {
+            int[][] neighbour;
+            for (int i = 0; i < N2; i++)
+            {
+                for (int s = 0; s < N2 - 1; s++)
+                {
+                    for (int e = s + 1; e < N2; e++)
+                    {
+                        Tuple<int, int> P1 = blockPositions[i * N2 + s];
+                        Tuple<int, int> P2 = blockPositions[i * N2 + e];
+
+                        neighbour = swap(state, P1, P2);
+                        if (evaluate(neighbour) < evaluate(state))
+                        {
+                            return neighbour;
+                        }
+                    }
+                }
+            }
+            return state;
+        }
+
+        public int[][] swap(int[][] state, Tuple<int, int> P1, Tuple<int, int> P2)
+        {
+            int[][] newState = new int[N2][];
+            for (int i = 0; i < N2; i++)
+            {
+                int[] row = new int[N2];
+                state[i].CopyTo(row, 0);
+                newState[i] = row;
+            }
+
+            int tmp = newState[P1.Item1][P1.Item2];
+            newState[P1.Item1][P1.Item2] = newState[P2.Item1][P2.Item2];
+            newState[P2.Item1][P2.Item2] = tmp;
+            return newState;
+        }
+
+        public int[][] randomRestartHillClimb(int[][] startState)
+        {
+            int[][] bestResult = hillClimb(startState);
+            int bestValue = evaluate(bestResult);
             for (int i = 1; i < RANDOM_RESTART_COUNT - 1; i++)
             {
-                Puzzle state = randomPuzzle();
-                Puzzle result = hillClimb(state);
-                if (result.Value < bestValue)
+                int[][] state = randomPuzzle();
+                int[][] result = hillClimb(state);
+                if (evaluate(result) < bestValue)
                 {
-                    bestValue = result.Value;
+                    bestValue = evaluate(result);
                     bestResult = result;
                 }
             }
@@ -192,21 +239,23 @@ namespace CI_practicum2
         }
 
         // Perform iterated local search
-        public Puzzle iteratedLocalSearch(Puzzle startState)
+        public int[][] iteratedLocalSearch(int[][] startState)
         {
+            Console.WriteLine();
+            Console.WriteLine("||-----|-----|-----|-----|-----|-----|-----|-----|-----|-----||");
             Console.Write("||");
             int p50 = ILS_RESTART_COUNT / 50;
             int bar = p50;
-            Puzzle state = hillClimb(startState);
-            int bestValue = state.Value;
+            int[][] state = hillClimb(startState);
+            int bestValue = evaluate(state);
             for (int i = 0; i < ILS_RESTART_COUNT - 1; i++)
             {
-                Puzzle next = randomWalk(state);
+                int[][] next = randomWalk(state);
                 next = hillClimb(next);
-                if (next.Value < state.Value)
+                if (evaluate(next) < evaluate(state))
                 {
                     state = next;
-                    bestValue = next.Value;
+                    bestValue = evaluate(next);
                 }
                 if (restartCount % p50 == 0)
                 {
@@ -219,11 +268,12 @@ namespace CI_practicum2
                 }
             }
             Console.Write("|\n");
+            Console.WriteLine();
             return state;
         }
 
         //Performs a random walk of S random steps, given an initial state
-        public Puzzle randomWalk(Puzzle state)
+        public int[][] randomWalk(int[][] state)
         {
             for (int i = 0; i < ILS_WALK_LENGTH; i++)
             {
@@ -233,7 +283,7 @@ namespace CI_practicum2
         }
 
         // Returns a random neighbour
-        public Puzzle randomNeighbour(Puzzle state)
+        public int[][] randomNeighbour(int[][] state)
         {
             int randomBlock = gen.Next(N2);
             int randomP1 = gen.Next(N2);
@@ -242,135 +292,106 @@ namespace CI_practicum2
                 randomP2 = N2 - 1;
             Tuple<int, int> P1 = blockPositions[randomBlock * N2 + randomP1];
             Tuple<int, int> P2 = blockPositions[randomBlock * N2 + randomP2];
-            state.Swap(P1, P2);
-            return state;
+            return swap(state, P1, P2);
         }
 
-        // Find a neighbour that improves over the current state
-        public Puzzle improvingNeighbour(Puzzle state)
+        // Perform a tabu search
+        public int[][] tabuSearch(int[][] state)
         {
-            // Loop through blocks
+            Stack<int[][]> tabuList = new Stack<int[][]>();
+            tabuList.Push(state);
+            int[][] best = state;
+
+            List<int[][]> nextList = neighbours(state).Except(tabuList).ToList();
+            int maxValue = 0;
+            int[][] next = state;
+
+            foreach (int[][] p in nextList)
+                if (evaluate(p) > maxValue)
+                {
+                    maxValue = evaluate(p);
+                    next = p;
+                }
+            while (true)
+            {
+                if (evaluate(next) <= evaluate(best))
+                {
+                    best = next;
+                }
+                state = next;
+                tabuList.Push(state);
+                if (tabuList.Count > 1)
+                    tabuList.Pop();
+                nextList = neighbours(state).Except(tabuList).ToList();
+                if (nextList.Count == 0)
+                    break;
+                maxValue = 0;
+                foreach (int[][] p in nextList)
+                    if (evaluate(p) > maxValue)
+                    {
+                        maxValue = evaluate(p);
+                        next = p;
+                    }
+            }
+            return best;
+        }
+
+        public List<int[][]> neighbours(int[][] state)
+        {
+            List<int[][]> neighbours = new List<int[][]>();
             for (int i = 0; i < N2; i++)
             {
                 for (int s = 0; s < N2 - 1; s++)
                 {
                     for (int e = s + 1; e < N2; e++)
                     {
-                        Puzzle neighbour = Puzzle.fromState(state);
+                        int[][] neighbour;
                         Tuple<int, int> P1 = blockPositions[i * N2 + s];
                         Tuple<int, int> P2 = blockPositions[i * N2 + e];
-                        neighbour.Swap(P1, P2);
-                        if (neighbour.Value < state.Value)
-                        {
-                            return neighbour;
-                        }
+                        neighbour = swap(state, P1, P2);
+                        neighbours.Add(neighbour);
                     }
                 }
             }
-            return state;
+            return neighbours;
         }
 
-        // evaluate a state
-        public int[] evaluate(Puzzle state)
+        // Evaluate puzzle
+        public int evaluate(int[][] state)
         {
-            int[] eval = new int[N2 * 2];
+            int value = 0;
             for (int i = 0; i < N2; i++)
             {
-                eval[i] = score(state.Rows[i]); 
-                eval[i + N2] = score(state.Columns[i]);
+                value += score(state[i]) + score(column(state, i));
             }
-            return eval;
+            return value;
         }
-        
-        // assign score to row or column
-        public static int score(int[] list)
+
+        // Assign score to row or column
+        public int score(int[] list)
         {
             int dups = 0;
             int score = 0; 
 
             for (int i = 0; i < N2; i++)
             {
-                int mask = 1 << (list[i] - 1);
+                int mask = masks[list[i] - 1];
                 score += ((mask & dups) > 0) ? 1 : 0;
                 dups |= mask;
             }
             return score;
         }
-    }
 
-    // Struct to hold a sudoku puzzle
-    struct Puzzle
-    {
-        public int[][] Rows;
-        public int[][] Columns;
-
-        public int[] Scores;
-        public int Value;
-
-        // Create new puzzle
-        public Puzzle(int[][] rows, int[][] columns)
+        // Find column from state;
+        public int[] column(int[][] state, int index)
         {
-            this.Rows = rows;
-            this.Columns = columns;
+            int[] col = new int[N2];
 
-            this.Scores = new int[0];
-            this.Value = 0;
-        }
-
-        public static Puzzle fromState(Puzzle state)
-        {
-            return new Puzzle(state.Rows, state.Columns) { Scores = state.Scores, Value = state.Value };
-        }
-
-        public void setScores(int[] scores)
-        {
-            this.Scores = scores;
-
-            this.Value = 0;
-            for (int i = 0; i < scores.Length; i++)
+            for (int i = 0; i < N2; i++)
             {
-                this.Value += scores[i];
+                col[i] = state[i][index];
             }
-        }
-
-        // Swap operator
-        public void Swap(Tuple<int, int> P1, Tuple<int, int> P2)
-        {
-            // retrieve values
-            int v1 = Rows[P1.Item1][P1.Item2];
-            int v2 = Rows[P2.Item1][P2.Item2];
-
-            // update rows
-            Rows[P1.Item1][P1.Item2] = v2;
-            Rows[P2.Item1][P2.Item2] = v1;
-
-            // update columns
-            Columns[P1.Item2][P1.Item1] = v2;
-            Columns[P2.Item2][P2.Item1] = v1;
-
-            updateScores(P1, P2);
-        }
-
-        // Update state value after swap
-        public void updateScores(Tuple<int, int> P1, Tuple<int, int> P2)
-        {
-            Scores[P1.Item1] = Program.score(Rows[P1.Item1]);
-            if (P1.Item1 != P2.Item1)
-            {
-                Scores[P2.Item1] = Program.score(Rows[P2.Item1]);
-            }
-   
-            Scores[P1.Item2 + Program.N2] = Program.score(Columns[P1.Item2]);
-            if (P1.Item2 != P2.Item2)
-            {
-                Scores[P2.Item2 + Program.N2] = Program.score(Columns[P2.Item2]);
-            }
-
-            Value = 0;
-            for (int i = 0; i < Program.N2 * 2; i++)
-            {
-                Value += Scores[i]; 
-            }
+            return col;
         }
     }
 }
