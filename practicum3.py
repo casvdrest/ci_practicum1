@@ -10,13 +10,13 @@ def read_puzzle():
     puzzle = list()
     for i in range(N2):
         puzzle = puzzle + input().split()
-    return puzzle
+    return [chr(int(x) + 97) for x in puzzle]
 
 N        = read_N()
-N2       = N**2di
-digits   = [x for x in range(N2)]
+N2       = N**2
+digits   = ''.join([chr(c) for c in range(98, 98 + N2)])
 rows     = ''.join([chr(c) for c in range(65, 65 + N2)])
-cols     = ''.join([chr(c) for c in range(97, 97 + N2)])
+cols     = digits
 
 rblocks = [rows[i * N : i * N + N] for i in range(0, N)]
 cblocks = [cols[i * N : i * N + N] for i in range(0, N)]
@@ -30,15 +30,15 @@ units = dict((s, [u for u in unitlist if s in u])
 peers = dict((s, set(sum(units[s],[]))-set([s]))
              for s in squares)
 
-grid = read_puzzle()
-
-#display(solve(grid))
+def run():
+    display(solve(read_puzzle()))
 
 def parse_grid(grid):
     """Convert grid to a dict of possible values, {square: digits}, or
     return False if a contradiction is detected."""
     ## To start, every square can be any digit; then assign values from the grid.
     values = dict((s, digits) for s in squares)
+
     for s,d in grid_values(grid).items():
         if d in digits and not assign(values, s, d):
             return False ## (Fail if we can't assign d to square s.)
@@ -88,12 +88,13 @@ def display(values):
     cdelim = ''.join([cblocks[i][-1] for i in range(N)])
     rdelim = ''.join([rblocks[i][-1] for i in range(N)])
 
-    vline = '+'.join(['-'*N * width]*N)
+    vline =  '+' + '+'.join(['-'*N * width]*N) + '+'
     print(vline)
     for r in rows:
-        line = ''
+        line = '|'
         for c in cols:
-            line = line + values[r + c] + ' '
+            intval = ord(values[r + c]) - 97
+            line = line + (" " if intval > 9 else "  ") + str(intval)
             if c in cdelim:
                 line = line + '|'
         print(line)
