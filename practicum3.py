@@ -1,3 +1,18 @@
+import time
+
+# define globals
+N  = 0
+N2 = 0
+digits = list()
+rows = list()
+cols = list()
+rblocks = list()
+cblocks = list()
+squares = list()
+units = dict()
+peers = dict()
+
+
 def cross(A, B):
     "Cross product of elements in A and elements in B."
     return [a+b for a in A for b in B]
@@ -9,29 +24,11 @@ def read_N():
 def read_puzzle():
     puzzle = list()
     for i in range(N2):
-        puzzle = puzzle + input().split()
+        if N > 3:
+            puzzle = puzzle + input().split()
+        else:
+            puzzle = puzzle + list(input())
     return [chr(int(x) + 97) for x in puzzle]
-
-N        = read_N()
-N2       = N**2
-digits   = ''.join([chr(c) for c in range(98, 98 + N2)])
-rows     = ''.join([chr(c) for c in range(65, 65 + N2)])
-cols     = digits
-
-rblocks = [rows[i * N : i * N + N] for i in range(0, N)]
-cblocks = [cols[i * N : i * N + N] for i in range(0, N)]
-
-squares  = cross(rows, cols)
-unitlist = ([cross(rows, c) for c in cols] +
-            [cross(r, cols) for r in rows] +
-            [cross(rs, cs) for rs in rblocks for cs in cblocks])
-units = dict((s, [u for u in unitlist if s in u]) 
-             for s in squares)
-peers = dict((s, set(sum(units[s],[]))-set([s]))
-             for s in squares)
-
-def run():
-    display(solve(read_puzzle()))
 
 def parse_grid(grid):
     """Convert grid to a dict of possible values, {square: digits}, or
@@ -94,7 +91,7 @@ def display(values):
         line = '|'
         for c in cols:
             intval = ord(values[r + c]) - 97
-            line = line + (" " if intval > 9 else "  ") + str(intval)
+            line = line + (" " if intval > 9 or N == 3 else "  ") + str(intval)
             if c in cdelim:
                 line = line + '|'
         print(line)
@@ -111,12 +108,74 @@ def search(values):
         return values ## Solved!
     ## Chose the unfilled square s with the fewest possibilities
     n,s = min((len(values[s]), s) for s in squares if len(values[s]) > 1)
-    return some(search(assign(values.copy(), s, d)) 
-        for d in values[s])
+    return some(search(assign(values.copy(), s, d)) for d in values[s])
 
 def some(seq):
     "Return some element of seq that is true."
     for e in seq:
         if e: return e
     return False
+
+def run():
+    global N, N2
+
+    # initialize puzzle dimensions
+    N        = read_N()
+    N2       = N**2
+
+    # initialize other variables
+    init_vars()
+
+    # read input puzzle, solve it and display results
+    display(solve(read_puzzle()))
+
+# initialize variables
+def init_vars():
+    global digits, rows, cols, rblocks, cblocks, squares, units, peers
+
+    digits   = ''.join([chr(c) for c in range(98, 98 + N2)])
+    rows     = ''.join([chr(c) for c in range(65, 65 + N2)])
+    cols     = digits
+
+    rblocks  = [rows[i * N : i * N + N] for i in range(0, N)]
+    cblocks  = [cols[i * N : i * N + N] for i in range(0, N)]
+
+    squares  = cross(rows, cols)
+    unitlist = ([cross(rows, c) for c in cols] +
+                [cross(r, cols) for r in rows] +
+                [cross(rs, cs) for rs in rblocks for cs in cblocks])
+
+    units    = dict((s, [u for u in unitlist if s in u]) 
+                    for s in squares)
+    peers    = dict((s, set(sum(units[s],[]))-set([s]))
+                    for s in squares)
+
+# run test puzzles
+def run_tests(n):
+    global N, N2
+
+    N  = n
+    N2 = n**2
+
+    init_vars()
+
+    count = int(input("Testpuzzle count: "))
+
+    puzzles = list()
+    #read test puzzles. Assume a horizontal delimiter before every puzzle
+    for i in range(count):
+        input()
+        puzzles.append(read_puzzle())
+
+    totalSolvingTime = 0
+    for p in puzzles:
+        start = time.clock()
+        result = solve(p)
+        diff = time.clock() - start
+        print("Solved puzzle in " + str(diff) + " seconds. ")
+        display(result)
+        totalSolvingTime = totalSolvingTime + diff
+
+    print("Solved " + str(count) + " " + str(N2) + "x" + str(N2) + " puzzles in " + str(totalSolvingTime) + " seconds, averaging " + str(totalSolvingTime / count) + " seconds per puzzle.") 
+
     
