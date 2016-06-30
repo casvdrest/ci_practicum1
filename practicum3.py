@@ -1,4 +1,5 @@
 import time
+import random
 
 # define globals
 N  = 0
@@ -10,6 +11,7 @@ rblocks = list()
 cblocks = list()
 squares = list()
 units = dict()
+unitlist = list()
 peers = dict()
 
 
@@ -66,6 +68,23 @@ def eliminate(values, s, d):
         d2 = values[s]
         if not all(eliminate(values, s2, d2) for s2 in peers[s]):
             return False
+
+    ## check for 'naked twins'
+    elif len(values[s]) == 2:
+        t = values[s]
+        for s2 in peers[s]:
+            if t == values[s2]:
+                uns = [x for x in unitlist if t in x and s2 in x]
+
+                for u in uns:
+                    if not all(eliminate(values, s3, t[:1]) for s3 in u):
+                        return False
+
+                    if not all(eliminate(values, s3, t[1:]) for s3 in u):
+                        return False
+
+
+
     ## (2) If a unit u is reduced to only one place for a value d, then put it there.
     for u in units[s]:
         dplaces = [s for s in u if d in values[s]]
@@ -107,7 +126,8 @@ def search(values):
     if all(len(values[s]) == 1 for s in squares): 
         return values ## Solved!
     ## Chose the unfilled square s with the fewest possibilities
-    n,s = min((len(values[s]), s) for s in squares if len(values[s]) > 1)
+    n,s = min((len([x for x in peers[s] if len(values[x]) > 1]), s) for s in squares if len(values[s]) > 1)
+
     return some(search(assign(values.copy(), s, d)) for d in values[s])
 
 def some(seq):
@@ -131,7 +151,7 @@ def run():
 
 # initialize variables
 def init_vars():
-    global digits, rows, cols, rblocks, cblocks, squares, units, peers
+    global digits, rows, cols, rblocks, cblocks, squares, unitlist, units, peers
 
     digits   = ''.join([chr(c) for c in range(98, 98 + N2)])
     rows     = ''.join([chr(c) for c in range(65, 65 + N2)])
@@ -177,5 +197,3 @@ def run_tests(n):
         totalSolvingTime = totalSolvingTime + diff
 
     print("Solved " + str(count) + " " + str(N2) + "x" + str(N2) + " puzzles in " + str(totalSolvingTime) + " seconds, averaging " + str(totalSolvingTime / count) + " seconds per puzzle.") 
-
-    
